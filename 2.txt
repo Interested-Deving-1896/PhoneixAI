@@ -1,0 +1,1847 @@
+
+
+Environment Configuration & Database Schema-
+# .env.example
+
+# Copy this file to .env.local and fill in your values
+
+# ==========================================
+
+# DATABASE CONFIGURATION
+
+# ==========================================
+
+DATABASE_URL=“postgresql://user:password@localhost:5432/phoenix_ai”
+
+# Alternative: SQLite for development
+
+# DATABASE_URL=“file:./dev.db”
+
+# ==========================================
+
+# AI PROVIDER API KEYS
+
+# ==========================================
+
+# Anthropic (Claude)
+
+ANTHROPIC_API_KEY=“sk-ant-your-key-here”
+
+# OpenAI (GPT)
+
+OPENAI_API_KEY=“sk-your-openai-key-here”
+OPENAI_ORG_ID=“org-your-org-id” # Optional
+
+# Google (Gemini)
+
+GOOGLE_API_KEY=“your-google-api-key-here”
+
+# Cohere
+
+COHERE_API_KEY=“your-cohere-api-key-here”
+
+# Local AI (Ollama/LMStudio)
+
+LOCAL_AI_URL=“http://localhost:11434” # Default Ollama URL
+
+# LOCAL_AI_URL=“http://localhost:1234” # LMStudio default
+
+# ==========================================
+
+# AI CONFIGURATION
+
+# ==========================================
+
+AI_DEFAULT_PROVIDER=“anthropic”
+AI_DEFAULT_MODEL=“claude-3-5-sonnet-20241022”
+AI_DEFAULT_TEMPERATURE=“0.7”
+AI_DEFAULT_MAX_TOKENS=“4000”
+AI_STREAM_ENABLED=“true”
+AI_FALLBACK_ENABLED=“true”
+AI_MAX_RETRIES=“3”
+AI_RETRY_DELAY=“1000”
+AI_FALLBACK_ORDER=“anthropic,openai,google,cohere,local”
+
+# ==========================================
+
+# AUTHENTICATION
+
+# ==========================================
+
+NEXTAUTH_SECRET=“your-super-secret-jwt-secret-here”
+NEXTAUTH_URL=“http://localhost:3000”
+
+# GitHub OAuth (Optional)
+
+GITHUB_ID=“your-github-oauth-app-id”
+GITHUB_SECRET=“your-github-oauth-app-secret”
+
+# Google OAuth (Optional)
+
+GOOGLE_CLIENT_ID=“your-google-oauth-client-id”
+GOOGLE_CLIENT_SECRET=“your-google-oauth-client-secret”
+
+# ==========================================
+
+# APPLICATION SETTINGS
+
+# ==========================================
+
+APP_NAME=“Phoenix AI”
+APP_URL=“http://localhost:3000”
+APP_ENV=“development” # production, staging, development
+
+# Rate Limiting
+
+RATE_LIMIT_REQUESTS_PER_MINUTE=“60”
+RATE_LIMIT_REQUESTS_PER_HOUR=“1000”
+
+# File Upload
+
+MAX_FILE_SIZE=“10485760” # 10MB in bytes
+ALLOWED_FILE_TYPES=“txt,md,json,csv,pdf”
+
+# ==========================================
+
+# MONITORING & ANALYTICS
+
+# ==========================================
+
+ANALYTICS_ENABLED=“false”
+SENTRY_DSN=”” # Optional error tracking
+MIXPANEL_TOKEN=”” # Optional analytics
+
+# ==========================================
+
+# EMAIL CONFIGURATION (Optional)
+
+# ==========================================
+
+SMTP_HOST=“smtp.gmail.com”
+SMTP_PORT=“587”
+SMTP_USER=“your-email@gmail.com”
+SMTP_PASS=“your-app-password”
+FROM_EMAIL=“noreply@phoenixai.dev”
+
+# ==========================================
+
+# DEPLOYMENT SPECIFIC
+
+# ==========================================
+
+# Vercel
+
+VERCEL_TOKEN=“your-vercel-token”
+
+# Railway
+
+RAILWAY_TOKEN=“your-railway-token”
+
+# Render
+
+RENDER_API_KEY=“your-render-api-key”
+
+# Docker
+
+DOCKER_REGISTRY=“your-registry-url”
+
+# ==========================================
+
+# DEVELOPMENT
+
+# ==========================================
+
+LOG_LEVEL=“info” # debug, info, warn, error
+DEBUG_MODE=“false”
+
+
+
+Prisma database Schema -
+// schema.prisma
+generator client {
+provider = “prisma-client-js”
+}
+
+datasource db {
+provider = “postgresql”
+url      = env(“DATABASE_URL”)
+// For SQLite development:
+// provider = “sqlite”
+// url      = env(“DATABASE_URL”)
+}
+
+// ==========================================
+// USER MANAGEMENT
+// ==========================================
+
+model User {
+id            String    @id @default(cuid())
+email         String    @unique
+name          String?
+image         String?
+emailVerified DateTime?
+createdAt     DateTime  @default(now())
+updatedAt     DateTime  @updatedAt
+
+// Authentication
+accounts Account[]
+sessions Session[]
+
+// AI Configuration
+aiConfig UserAIConfig?
+
+// Chat History
+chatSessions ChatSession[]
+messages     Message[]
+
+// Usage Tracking
+usage UserUsage?
+
+@@map(“users”)
+}
+
+model Account {
+id                String  @id @default(cuid())
+userId            String
+type              String
+provider          String
+providerAccountId String
+refresh_token     String? @db.Text
+access_token      String? @db.Text
+expires_at        Int?
+token_type        String?
+scope             String?
+id_token          String? @db.Text
+session_state     String?
+
+user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+@@unique([provider, providerAccountId])
+@@map(“accounts”)
+}
+
+model Session {
+id           String   @id @default(cuid())
+sessionToken String   @unique
+userId       String
+expires      DateTime
+user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+@@map(“sessions”)
+}
+
+model VerificationToken {
+identifier String
+token      String   @unique
+expires    DateTime
+
+@@unique([identifier, token])
+@@map(“verification_tokens”)
+}
+
+// ==========================================
+// AI CONFIGURATION
+// ==========================================
+
+model UserAIConfig {
+id                String   @id @default(cuid())
+userId            String   @unique
+createdAt         DateTime @default(now())
+updatedAt         DateTime @updatedAt
+
+// Default Provider Settings
+defaultProvider   String   @default(“anthropic”)
+defaultModel      String   @default(“claude-3-5-sonnet-20241022”)
+temperature       Float    @default(0.7)
+maxTokens         Int      @default(4000)
+streamEnabled     Boolean  @default(true)
+fallbackEnabled   Boolean  @default(true)
+
+// Provider Preferences
+providerSettings  Json     @default(”{}”)
+
+// Custom Prompts
+systemPrompts     Json     @default(”{}”)
+
+user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+@@map(“user_ai_configs”)
+}
+
+// ==========================================
+// CHAT MANAGEMENT
+// ==========================================
+
+model ChatSession {
+id          String   @id @default(cuid())
+userId      String
+title       String
+phase       String   @default(“discovery”)
+provider    String
+model       String
+config      Json     @default(”{}”)
+createdAt   DateTime @default(now())
+updatedAt   DateTime @updatedAt
+isArchived  Boolean  @default(false)
+isPublic    Boolean  @default(false)
+
+// Metadata
+metadata    Json     @default(”{}”)
+tags        String[] @default([])
+
+user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+messages Message[]
+
+@@map(“chat_sessions”)
+}
+
+model Message {
+id            String      @id @default(cuid())
+sessionId     String
+userId        String
+type          MessageType
+content       String      @db.Text
+provider      String?
+model         String?
+createdAt     DateTime    @default(now())
+
+// AI Response Metadata
+metadata      Json        @default(”{}”)
+tokensUsed    Int?
+responseTime  Int?
+confidence    Float?
+
+// Message Threading
+parentId      String?
+children      Message[]   @relation(“MessageThread”)
+parent        Message?    @relation(“MessageThread”, fields: [parentId], references: [id])
+
+session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+@@map(“messages”)
+}
+
+enum MessageType {
+USER
+ASSISTANT
+SYSTEM
+ERROR
+}
+
+// ==========================================
+// USAGE TRACKING
+// ==========================================
+
+model UserUsage {
+id              String   @id @default(cuid())
+userId          String   @unique
+createdAt       DateTime @default(now())
+updatedAt       DateTime @updatedAt
+
+// Token Usage
+totalTokens     Int      @default(0)
+monthlyTokens   Int      @default(0)
+dailyTokens     Int      @default(0)
+
+// Request Counts
+totalRequests   Int      @default(0)
+monthlyRequests Int      @default(0)
+dailyRequests   Int      @default(0)
+
+// Provider Usage
+providerUsage   Json     @default(”{}”)
+
+// Reset Timestamps
+lastDailyReset  DateTime @default(now())
+lastMonthlyReset DateTime @default(now())
+
+user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+@@map(“user_usage”)
+}
+
+// ==========================================
+// PROVIDER MANAGEMENT
+// ==========================================
+
+model ProviderStatus {
+id            String   @id @default(cuid())
+name          String   @unique
+status        String   // online, offline, degraded
+lastCheck     DateTime @default(now())
+responseTime  Int?
+errorCount    Int      @default(0)
+metadata      Json     @default(”{}”)
+
+// Health Check History
+healthChecks  HealthCheck[]
+
+@@map(“provider_status”)
+}
+
+model HealthCheck {
+id           String   @id @default(cuid())
+providerId   String
+status       String
+responseTime Int?
+error        String?
+checkedAt    DateTime @default(now())
+
+provider ProviderStatus @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+@@map(“health_checks”)
+}
+
+// ==========================================
+// ANALYTICS & LOGGING
+// ==========================================
+
+model ApiLog {
+id          String   @id @default(cuid())
+userId      String?
+provider    String
+model       String?
+endpoint    String
+method      String
+statusCode  Int
+responseTime Int
+tokenCount  Int?
+error       String?
+createdAt   DateTime @default(now())
+
+// Request metadata
+userAgent   String?
+ipAddress   String?
+metadata    Json     @default(”{}”)
+
+@@map(“api_logs”)
+}
+
+model SystemEvent {
+id        String   @id @default(cuid())
+type      String   // error, warning, info, debug
+message   String
+context   Json     @default(”{}”)
+createdAt DateTime @default(now())
+
+// Optional associations
+userId    String?
+sessionId String?
+
+@@map(“system_events”)
+}
+
+// ==========================================
+// CONFIGURATION
+// ==========================================
+
+model SystemConfig {
+id        String   @id @default(cuid())
+key       String   @unique
+value     String   @db.Text
+type      String   @default(“string”) // string, number, boolean, json
+updatedAt DateTime @updatedAt
+updatedBy String?
+
+@@map(“system_config”)
+}
+
+// ==========================================
+// EXPORTS & SHARING
+// ==========================================
+
+model Export {
+id          String     @id @default(cuid())
+userId      String
+sessionId   String?
+type        ExportType
+format      String
+filename    String
+fileUrl     String?
+status      String     @default(“pending”) // pending, completed, failed
+createdAt   DateTime   @default(now())
+completedAt DateTime?
+metadata    Json       @default(”{}”)
+
+@@map(“exports”)
+}
+
+enum ExportType {
+CHAT_SESSION
+USER_DATA
+ANALYTICS
+}
+
+model SharedChat {
+id        String   @id @default(cuid())
+sessionId String   @unique
+shareId   String   @unique @default(cuid())
+userId    String
+title     String
+isPublic  Boolean  @default(false)
+password  String?
+expiresAt DateTime?
+views     Int      @default(0)
+createdAt DateTime @default(now())
+
+@@map(“shared_chats”)
+}
+
+
+
+
+Authentication & Testing Configuration - 
+// lib/auth.ts
+import { NextAuthOptions } from ‘next-auth’;
+import { PrismaAdapter } from ‘@next-auth/prisma-adapter’;
+import { prisma } from ‘./prisma’;
+import GithubProvider from ‘next-auth/providers/github’;
+import GoogleProvider from ‘next-auth/providers/google’;
+import CredentialsProvider from ‘next-auth/providers/credentials’;
+import bcrypt from ‘bcryptjs’;
+
+export const authOptions: NextAuthOptions = {
+adapter: PrismaAdapter(prisma),
+providers: [
+GithubProvider({
+clientId: process.env.GITHUB_ID!,
+clientSecret: process.env.GITHUB_SECRET!,
+}),
+GoogleProvider({
+clientId: process.env.GOOGLE_CLIENT_ID!,
+clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+}),
+CredentialsProvider({
+name: ‘credentials’,
+credentials: {
+email: { label: ‘Email’, type: ‘email’ },
+password: { label: ‘Password’, type: ‘password’ }
+},
+async authorize(credentials) {
+if (!credentials?.email || !credentials?.password) {
+return null;
+}
+
+```
+    const user = await prisma.user.findUnique({
+      where: { email: credentials.email }
+    });
+
+    if (!user || !user.password) {
+      return null;
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      credentials.password,
+      user.password
+    );
+
+    if (!isPasswordValid) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      image: user.image,
+    };
+  }
+})
+```
+
+],
+session: {
+strategy: ‘jwt’,
+maxAge: 30 * 24 * 60 * 60, // 30 days
+},
+pages: {
+signIn: ‘/auth/signin’,
+signUp: ‘/auth/signup’,
+error: ‘/auth/error’,
+},
+callbacks: {
+async jwt({ token, user, account }) {
+if (user) {
+token.userId = user.id;
+}
+return token;
+},
+async session({ session, token }) {
+if (token) {
+session.user.id = token.userId as string;
+}
+return session;
+},
+async signIn({ user, account, profile }) {
+// Create default AI config for new users
+if (account?.provider && user.id) {
+await prisma.userAIConfig.upsert({
+where: { userId: user.id },
+update: {},
+create: {
+userId: user.id,
+defaultProvider: ‘anthropic’,
+defaultModel: ‘claude-3-5-sonnet-20241022’,
+temperature: 0.7,
+maxTokens: 4000,
+streamEnabled: true,
+fallbackEnabled: true,
+},
+});
+
+```
+    // Initialize usage tracking
+    await prisma.userUsage.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: {
+        userId: user.id,
+      },
+    });
+  }
+  return true;
+},
+```
+
+},
+secret: process.env.NEXTAUTH_SECRET,
+};
+
+// lib/prisma.ts
+import { PrismaClient } from ‘@prisma/client’;
+
+declare global {
+var prisma: PrismaClient | undefined;
+}
+
+export const prisma = globalThis.prisma || new PrismaClient();
+
+if (process.env.NODE_ENV !== ‘production’) {
+globalThis.prisma = prisma;
+}
+
+// lib/middleware/auth.ts
+import { NextRequest, NextResponse } from ‘next/server’;
+import { getToken } from ‘next-auth/jwt’;
+
+export async function authMiddleware(
+request: NextRequest,
+response: NextResponse
+) {
+const token = await getToken({ req: request });
+
+// Protected API routes
+if (request.nextUrl.pathname.startsWith(’/api/ai/’)) {
+if (!token) {
+return NextResponse.json(
+{ error: ‘Authentication required’ },
+{ status: 401 }
+);
+}
+}
+
+return response;
+}
+
+// lib/middleware/rateLimit.ts
+import { NextRequest, NextResponse } from ‘next/server’;
+
+interface RateLimitStore {
+[key: string]: {
+count: number;
+resetTime: number;
+};
+}
+
+const store: RateLimitStore = {};
+
+export function rateLimit(
+identifier: string,
+limit: number = 60,
+windowMs: number = 60 * 1000 // 1 minute
+): boolean {
+const now = Date.now();
+const windowStart = now - windowMs;
+
+// Clean up old entries
+Object.keys(store).forEach(key => {
+if (store[key].resetTime < windowStart) {
+delete store[key];
+}
+});
+
+if (!store[identifier]) {
+store[identifier] = {
+count: 1,
+resetTime: now + windowMs,
+};
+return true;
+}
+
+if (store[identifier].resetTime < now) {
+store[identifier] = {
+count: 1,
+resetTime: now + windowMs,
+};
+return true;
+}
+
+if (store[identifier].count >= limit) {
+return false;
+}
+
+store[identifier].count++;
+return true;
+}
+
+export async function rateLimitMiddleware(request: NextRequest) {
+const ip = request.ip || request.headers.get(‘x-forwarded-for’) || ‘unknown’;
+const identifier = `${ip}-${request.nextUrl.pathname}`;
+
+const isAllowed = rateLimit(
+identifier,
+parseInt(process.env.RATE_LIMIT_REQUESTS_PER_MINUTE || ‘60’),
+60 * 1000
+);
+
+if (!isAllowed) {
+return NextResponse.json(
+{ error: ‘Rate limit exceeded’ },
+{ status: 429 }
+);
+}
+
+return null; // Continue
+}
+
+// **tests**/setup.js
+import ‘@testing-library/jest-dom’;
+import { TextEncoder, TextDecoder } from ‘util’;
+
+// Polyfills
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
+
+// Mock Next.js router
+jest.mock(‘next/router’, () => ({
+useRouter() {
+return {
+route: ‘/’,
+pathname: ‘/’,
+query: ‘’,
+asPath: ‘/’,
+push: jest.fn(),
+pop: jest.fn(),
+reload: jest.fn(),
+back: jest.fn(),
+prefetch: jest.fn(),
+beforePopState: jest.fn(),
+events: {
+on: jest.fn(),
+off: jest.fn(),
+emit: jest.fn(),
+},
+};
+},
+}));
+
+// Mock NextAuth
+jest.mock(‘next-auth/react’, () => ({
+useSession: () => ({
+data: {
+user: {
+id: ‘test-user-id’,
+email: ‘test@example.com’,
+name: ‘Test User’,
+},
+},
+status: ‘authenticated’,
+}),
+signIn: jest.fn(),
+signOut: jest.fn(),
+}));
+
+// Mock environment variables
+process.env.NEXTAUTH_SECRET = ‘test-secret’;
+process.env.DATABASE_URL = ‘file:./test.db’;
+
+// **tests**/lib/ai/providers/anthropic.test.ts
+import { AnthropicProvider } from ‘../../../../lib/ai/providers/anthropic’;
+
+describe(‘AnthropicProvider’, () => {
+let provider: AnthropicProvider;
+
+beforeEach(() => {
+provider = new AnthropicProvider({
+apiKey: ‘test-key’,
+});
+});
+
+describe(‘chat’, () => {
+it(‘should format messages correctly’, async () => {
+const mockFetch = jest.fn().mockResolvedValue({
+ok: true,
+json: () => Promise.resolve({
+content: [{ text: ‘Test response’ }],
+usage: { output_tokens: 100 },
+stop_reason: ‘end_turn’,
+}),
+});
+
+```
+  global.fetch = mockFetch;
+
+  const messages = [
+    { role: 'user' as const, content: 'Hello' },
+  ];
+
+  const response = await provider.chat(messages, 'claude-3-haiku-20240307', {
+    temperature: 0.7,
+    maxTokens: 1000,
+    streamEnabled: false,
+  });
+
+  expect(response.content).toBe('Test response');
+  expect(response.provider).toBe('anthropic');
+  expect(mockFetch).toHaveBeenCalledWith(
+    'https://api.anthropic.com/v1/messages',
+    expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({
+        'x-api-key': 'test-key',
+      }),
+    })
+  );
+});
+
+it('should handle API errors gracefully', async () => {
+  const mockFetch = jest.fn().mockResolvedValue({
+    ok: false,
+    status: 401,
+  });
+
+  global.fetch = mockFetch;
+
+  const messages = [
+    { role: 'user' as const, content: 'Hello' },
+  ];
+
+  await expect(
+    provider.chat(messages, 'claude-3-haiku-20240307', {
+      temperature: 0.7,
+      maxTokens: 1000,
+      streamEnabled: false,
+    })
+  ).rejects.toThrow('Anthropic API error: 401');
+});
+```
+
+});
+
+describe(‘checkHealth’, () => {
+it(‘should return true for successful API call’, async () => {
+const mockFetch = jest.fn().mockResolvedValue({
+ok: true,
+});
+
+```
+  global.fetch = mockFetch;
+
+  const isHealthy = await provider.checkHealth();
+  expect(isHealthy).toBe(true);
+});
+
+it('should return false for failed API call', async () => {
+  const mockFetch = jest.fn().mockRejectedValue(new Error('Network error'));
+
+  global.fetch = mockFetch;
+
+  const isHealthy = await provider.checkHealth();
+  expect(isHealthy).toBe(false);
+});
+```
+
+});
+});
+
+// **tests**/components/PhoenixAI.test.tsx
+import { render, screen, fireEvent, waitFor } from ‘@testing-library/react’;
+import PhoenixAI from ‘../../components/PhoenixAI’;
+
+// Mock fetch
+const mockFetch = jest.fn();
+global.fetch = mockFetch;
+
+describe(‘PhoenixAI Component’, () => {
+beforeEach(() => {
+mockFetch.mockClear();
+});
+
+it(‘renders without crashing’, () => {
+render(<PhoenixAI />);
+expect(screen.getByText(‘Phoenix AI’)).toBeInTheDocument();
+});
+
+it(‘displays welcome message on load’, () => {
+render(<PhoenixAI />);
+expect(
+screen.getByText(/Welcome to Phoenix AI - your elite Principal Development & Design Architect/)
+).toBeInTheDocument();
+});
+
+it(‘allows user to type in input field’, () => {
+render(<PhoenixAI />);
+const input = screen.getByPlaceholderText(/Describe your project/);
+
+```
+fireEvent.change(input, { target: { value: 'Test message' } });
+expect(input).toHaveValue('Test message');
+```
+
+});
+
+it(‘sends message when send button is clicked’, async () => {
+mockFetch.mockResolvedValue({
+ok: true,
+json: () => Promise.resolve({
+content: ‘Test response’,
+model: ‘claude-3-haiku-20240307’,
+provider: ‘anthropic’,
+metadata: { responseTime: 1000 },
+}),
+});
+
+```
+render(<PhoenixAI />);
+
+const input = screen.getByPlaceholderText(/Describe your project/);
+const sendButton = screen.getByRole('button', { name: /send/i });
+
+fireEvent.change(input, { target: { value: 'Hello Phoenix' } });
+fireEvent.click(sendButton);
+
+await waitFor(() => {
+  expect(mockFetch).toHaveBeenCalledWith('/api/ai/chat', expect.any(Object));
+});
+```
+
+});
+
+it(‘changes phase when phase button is clicked’, () => {
+render(<PhoenixAI />);
+
+```
+const conceptButton = screen.getByText('Conceptualization');
+fireEvent.click(conceptButton);
+
+// Check if the phase changed (you might need to add data-testid for better testing)
+expect(conceptButton.closest('button')).toHaveClass('bg-gradient-to-r');
+```
+
+});
+});
+
+// jest.config.js
+const nextJest = require(‘next/jest’);
+
+const createJestConfig = nextJest({
+dir: ‘./’,
+});
+
+const customJestConfig = {
+setupFilesAfterEnv: [’<rootDir>/**tests**/setup.js’],
+moduleNameMapping: {
+‘^@/(.*)$’: ‘<rootDir>/$1’,
+},
+testEnvironment: ‘jest-environment-jsdom’,
+collectCoverageFrom: [
+’lib/**/*.{js,ts,tsx}’,
+‘components/**/*.{js,ts,tsx}’,
+’pages/**/*.{js,ts,tsx}’,
+‘!pages/_app.tsx’,
+‘!pages/_document.tsx’,
+’!**/*.d.ts’,
+],
+coverageThreshold: {
+global: {
+branches: 80,
+functions: 80,
+lines: 80,
+statements: 80,
+},
+},
+testMatch: [
+‘<rootDir>/**tests**/**/*.test.{js,ts,tsx}’,
+’<rootDir>/**/*.{test,spec}.{js,ts,tsx}’,
+],
+moduleDirectories: [‘node_modules’, ‘<rootDir>/’],
+testPathIgnorePatterns: [
+‘<rootDir>/.next/’,
+‘<rootDir>/node_modules/’,
+‘<rootDir>/**tests**/setup.js’,
+],
+};
+
+module.exports = createJestConfig(customJestConfig);
+
+// tailwind.config.js
+/** @type {import(‘tailwindcss’).Config} */
+module.exports = {
+content: [
+’./pages/**/*.{js,ts,jsx,tsx,mdx}’,
+‘./components/**/*.{js,ts,jsx,tsx,mdx}’,
+’./app/**/*.{js,ts,jsx,tsx,mdx}’,
+’./lib/**/*.{js,ts,jsx,tsx,mdx}’,
+],
+theme: {
+extend: {
+colors: {
+primary: {
+50: ‘#f0f4ff’,
+100: ‘#e0eaff’,
+200: ‘#c7d2fe’,
+300: ‘#a5b4fc’,
+400: ‘#818cf8’,
+500: ‘#6366f1’,
+600: ‘#4f46e5’,
+700: ‘#4338ca’,
+800: ‘#3730a3’,
+900: ‘#312e81’,
+950: ‘#1e1b4b’,
+},
+},
+animation: {
+‘pulse-slow’: ‘pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite’,
+‘bounce-slow’: ‘bounce 2s infinite’,
+},
+backgroundImage: {
+‘gradient-radial’: ‘radial-gradient(var(–tw-gradient-stops))’,
+‘gradient-conic’: ‘conic-gradient(from 180deg at 50% 50%, var(–tw-gradient-stops))’,
+},
+screens: {
+‘xs’: ‘475px’,
+},
+},
+},
+plugins: [
+require(’@tailwindcss/forms’),
+require(’@tailwindcss/typography’),
+],
+};
+
+// next.config.js
+/** @type {import(‘next’).NextConfig} */
+const nextConfig = {
+experimental: {
+serverComponentsExternalPackages: [’@prisma/client’],
+},
+images: {
+domains: [‘avatars.githubusercontent.com’, ‘lh3.googleusercontent.com’],
+},
+env: {
+CUSTOM_KEY: process.env.CUSTOM_KEY,
+},
+async headers() {
+return [
+{
+source: ’/api/:path*’,
+headers: [
+{ key: ‘Access-Control-Allow-Credentials’, value: ‘true’ },
+{ key: ‘Access-Control-Allow-Origin’, value: ‘*’ },
+{ key: ‘Access-Control-Allow-Methods’, value: ‘GET,DELETE,PATCH,POST,PUT’ },
+{ key: ‘Access-Control-Allow-Headers’, value: ‘X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version’ },
+],
+},
+];
+},
+webpack: (config, { isServer }) => {
+if (!isServer) {
+config.resolve.fallback = {
+…config.resolve.fallback,
+fs: false,
+net: false,
+tls: false,
+};
+}
+return config;
+},
+};
+
+module.exports = nextConfig;
+
+
+
+Deployment configurations and setup steps -
+# docker-compose.yml
+
+version: ‘3.8’
+
+services:
+phoenix-ai:
+build:
+context: .
+dockerfile: Dockerfile
+ports:
+- “3000:3000”
+environment:
+- NODE_ENV=production
+- DATABASE_URL=postgresql://postgres:password@postgres:5432/phoenix_ai
+- NEXTAUTH_SECRET=your-super-secret-here
+- NEXTAUTH_URL=http://localhost:3000
+depends_on:
+- postgres
+- redis
+volumes:
+- ./uploads:/app/uploads
+
+postgres:
+image: postgres:15-alpine
+restart: always
+environment:
+POSTGRES_DB: phoenix_ai
+POSTGRES_USER: postgres
+POSTGRES_PASSWORD: password
+ports:
+- “5432:5432”
+volumes:
+- postgres_data:/var/lib/postgresql/data
+
+redis:
+image: redis:7-alpine
+restart: always
+ports:
+- “6379:6379”
+volumes:
+- redis_data:/data
+
+ollama:
+image: ollama/ollama:latest
+restart: always
+ports:
+- “11434:11434”
+volumes:
+- ollama_data:/root/.ollama
+environment:
+- OLLAMA_HOST=0.0.0.0
+
+volumes:
+postgres_data:
+redis_data:
+ollama_data:
+
+-----
+
+# Dockerfile
+
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+
+FROM base AS deps
+RUN apk add –no-cache libc6-compat
+WORKDIR /app
+
+# Install dependencies based on the preferred package manager
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Rebuild the source code only when needed
+
+FROM base AS builder
+WORKDIR /app
+COPY –from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Generate Prisma client
+
+RUN npx prisma generate
+
+# Build the application
+
+RUN npm run build
+
+# Production image, copy all the files and run next
+
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV production
+
+RUN addgroup –system –gid 1001 nodejs
+RUN adduser –system –uid 1001 nextjs
+
+COPY –from=builder /app/public ./public
+
+# Set the correct permission for prerender cache
+
+RUN mkdir .next
+RUN chown nextjs:nodejs .next
+
+# Automatically leverage output traces to reduce image size
+
+COPY –from=builder –chown=nextjs:nodejs /app/.next/standalone ./
+COPY –from=builder –chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT 3000
+ENV HOSTNAME “0.0.0.0”
+
+CMD [“node”, “server.js”]
+
+-----
+
+# .dockerignore
+
+Dockerfile
+.dockerignore
+.next
+.git
+.gitignore
+README.md
+.env
+.env.local
+.env.production.local
+.env.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+node_modules
+
+-----
+
+# vercel.json
+
+{
+“version”: 2,
+“buildCommand”: “npm run build”,
+“devCommand”: “npm run dev”,
+“installCommand”: “npm install”,
+“framework”: “nextjs”,
+“functions”: {
+“pages/api/**/*.ts”: {
+“maxDuration”: 60
+}
+},
+“env”: {
+“DATABASE_URL”: “@database_url”,
+“NEXTAUTH_SECRET”: “@nextauth_secret”,
+“NEXTAUTH_URL”: “@nextauth_url”,
+“ANTHROPIC_API_KEY”: “@anthropic_api_key”,
+“OPENAI_API_KEY”: “@openai_api_key”,
+“GOOGLE_API_KEY”: “@google_api_key”
+},
+“build”: {
+“env”: {
+“DATABASE_URL”: “@database_url”
+}
+},
+“rewrites”: [
+{
+“source”: “/api/:path*”,
+“destination”: “/api/:path*”
+}
+]
+}
+
+-----
+
+# railway.toml
+
+[build]
+builder = “NIXPACKS”
+buildCommand = “npm run build”
+
+[deploy]
+healthcheckPath = “/api/health”
+healthcheckTimeout = 100
+restartPolicyType = “ON_FAILURE”
+restartPolicyMaxRetries = 10
+
+[[services]]
+name = “phoenix-ai”
+source = “.”
+
+[services.variables]
+NODE_ENV = “production”
+PORT = “3000”
+
+-----
+
+# render.yaml
+
+services:
+
+- type: web
+  name: phoenix-ai
+  env: node
+  plan: starter
+  buildCommand: npm run build
+  startCommand: npm start
+  envVars:
+  - key: NODE_ENV
+    value: production
+  - key: DATABASE_URL
+    fromDatabase:
+    name: phoenix-db
+    property: connectionString
+  - key: NEXTAUTH_SECRET
+    generateValue: true
+  - key: NEXTAUTH_URL
+    value: https://phoenix-ai.onrender.com
+
+databases:
+
+- name: phoenix-db
+  databaseName: phoenix_ai
+  user: phoenix_user
+  plan: free
+
+-----
+
+# .github/workflows/ci.yml
+
+name: CI/CD Pipeline
+
+on:
+push:
+branches: [ main, develop ]
+pull_request:
+branches: [ main ]
+
+jobs:
+test:
+runs-on: ubuntu-latest
+
+```
+strategy:
+  matrix:
+    node-version: [18.x, 20.x]
+
+steps:
+- uses: actions/checkout@v4
+
+- name: Use Node.js ${{ matrix.node-version }}
+  uses: actions/setup-node@v4
+  with:
+    node-version: ${{ matrix.node-version }}
+    cache: 'npm'
+
+- name: Install dependencies
+  run: npm ci
+
+- name: Generate Prisma Client
+  run: npx prisma generate
+
+- name: Run type check
+  run: npm run type-check
+
+- name: Run linting
+  run: npm run lint
+
+- name: Run tests
+  run: npm run test:coverage
+
+- name: Upload coverage reports
+  uses: codecov/codecov-action@v3
+  with:
+    token: ${{ secrets.CODECOV_TOKEN }}
+```
+
+build:
+needs: test
+runs-on: ubuntu-latest
+
+```
+steps:
+- uses: actions/checkout@v4
+
+- name: Use Node.js 18.x
+  uses: actions/setup-node@v4
+  with:
+    node-version: 18.x
+    cache: 'npm'
+
+- name: Install dependencies
+  run: npm ci
+
+- name: Generate Prisma Client
+  run: npx prisma generate
+
+- name: Build application
+  run: npm run build
+```
+
+deploy-vercel:
+if: github.ref == ‘refs/heads/main’
+needs: [test, build]
+runs-on: ubuntu-latest
+
+```
+steps:
+- uses: actions/checkout@v4
+
+- name: Deploy to Vercel
+  uses: amondnet/vercel-action@v25
+  with:
+    vercel-token: ${{ secrets.VERCEL_TOKEN }}
+    vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+    vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+    vercel-args: '--prod'
+```
+
+-----
+
+# scripts/setup.js
+
+#!/usr/bin/env node
+
+const fs = require(‘fs’);
+const path = require(‘path’);
+const crypto = require(‘crypto’);
+
+console.log(‘🚀 Setting up Phoenix AI Universal…\n’);
+
+// Generate secure secrets
+function generateSecret() {
+return crypto.randomBytes(32).toString(‘hex’);
+}
+
+// Check if .env.local exists
+const envPath = path.join(process.cwd(), ‘.env.local’);
+const envExamplePath = path.join(process.cwd(), ‘.env.example’);
+
+if (!fs.existsSync(envPath)) {
+if (fs.existsSync(envExamplePath)) {
+// Copy .env.example to .env.local
+let envContent = fs.readFileSync(envExamplePath, ‘utf8’);
+
+```
+// Generate and replace secrets
+envContent = envContent.replace(
+  'NEXTAUTH_SECRET="your-super-secret-jwt-secret-here"',
+  `NEXTAUTH_SECRET="${generateSecret()}"`
+);
+
+fs.writeFileSync(envPath, envContent);
+console.log('✅ Created .env.local from .env.example');
+console.log('⚠️  Please update the API keys in .env.local');
+```
+
+} else {
+console.log(‘❌ .env.example not found’);
+process.exit(1);
+}
+} else {
+console.log(‘✅ .env.local already exists’);
+}
+
+// Check for required tools
+console.log(’\n🔍 Checking system requirements…’);
+
+const requiredCommands = [‘node’, ‘npm’, ‘npx’];
+for (const cmd of requiredCommands) {
+try {
+require(‘child_process’).execSync(`${cmd} --version`, { stdio: ‘ignore’ });
+console.log(`✅ ${cmd} is installed`);
+} catch (error) {
+console.log(`❌ ${cmd} is not installed`);
+process.exit(1);
+}
+}
+
+// Database setup
+console.log(’\n📊 Setting up database…’);
+try {
+require(‘child_process’).execSync(‘npx prisma generate’, { stdio: ‘inherit’ });
+console.log(‘✅ Prisma client generated’);
+
+require(‘child_process’).execSync(‘npx prisma db push’, { stdio: ‘inherit’ });
+console.log(‘✅ Database schema applied’);
+} catch (error) {
+console.log(‘⚠️  Database setup failed. You may need to configure DATABASE_URL in .env.local’);
+}
+
+console.log(’\n🎉 Setup complete!’);
+console.log(’\nNext steps:’);
+console.log(‘1. Update API keys in .env.local’);
+console.log(‘2. Run: npm run dev’);
+console.log(‘3. Open: http://localhost:3000’);
+console.log(’\n📖 Check README.md for detailed configuration options.’);
+
+-----
+
+# scripts/deploy.js
+
+#!/usr/bin/env node
+
+const { execSync } = require(‘child_process’);
+
+const platform = process.argv[2];
+
+if (!platform) {
+console.log(‘Usage: npm run deploy <platform>’);
+console.log(‘Platforms: vercel, railway, render, docker’);
+process.exit(1);
+}
+
+console.log(`🚀 Deploying to ${platform}...`);
+
+switch (platform) {
+case ‘vercel’:
+execSync(‘vercel –prod’, { stdio: ‘inherit’ });
+break;
+
+case ‘railway’:
+execSync(‘railway up’, { stdio: ‘inherit’ });
+break;
+
+case ‘render’:
+console.log(‘Please push to your connected repository for Render deployment’);
+break;
+
+case ‘docker’:
+execSync(‘docker build -t phoenix-ai .’, { stdio: ‘inherit’ });
+execSync(‘docker-compose up -d’, { stdio: ‘inherit’ });
+break;
+
+default:
+console.log(`Unknown platform: ${platform}`);
+process.exit(1);
+}
+
+console.log(`✅ Deployment to ${platform} initiated!`);
+
+-----
+
+# .gitignore
+
+# Dependencies
+
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+
+/coverage
+**tests**/coverage
+
+# Next.js
+
+/.next/
+/out/
+
+# Production
+
+/build
+
+# Misc
+
+.DS_Store
+*.pem
+
+# Debug
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Local env files
+
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel
+
+.vercel
+
+# TypeScript
+
+*.tsbuildinfo
+next-env.d.ts
+
+# Database
+
+prisma/dev.db
+prisma/dev.db-journal
+
+# Uploads
+
+/uploads/*
+!/uploads/.gitkeep
+
+# IDE
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+
+Thumbs.db
+
+# Logs
+
+logs
+*.log
+
+# Runtime data
+
+pids
+*.pid
+*.seed
+*.pid.lock
+
+-----
+
+# .eslintrc.json
+
+{
+“extends”: [
+“next/core-web-vitals”,
+“@typescript-eslint/recommended”
+],
+“parser”: “@typescript-eslint/parser”,
+“plugins”: [”@typescript-eslint”],
+“rules”: {
+“@typescript-eslint/no-unused-vars”: “error”,
+“@typescript-eslint/no-explicit-any”: “warn”,
+“prefer-const”: “error”,
+“no-var”: “error”
+},
+“ignorePatterns”: [
+“node_modules/”,
+“.next/”,
+“out/”,
+“build/”
+]
+}
+
+-----
+
+# .prettierrc
+
+{
+“semi”: true,
+“trailingComma”: “es5”,
+“singleQuote”: true,
+“printWidth”: 80,
+“tabWidth”: 2,
+“useTabs”: false,
+“bracketSpacing”: true,
+“bracketSameLine”: false,
+“arrowParens”: “avoid”,
+“endOfLine”: “lf”,
+“plugins”: [“prettier-plugin-tailwindcss”]
+}
+
+-----
+
+# README.md
+
+# 🔥 Phoenix AI Universal
+
+> **The Ultimate Universal AI Interface** - Compatible with ANY AI model provider
+
+Phoenix AI is a sophisticated, production-ready interface that provides seamless access to multiple AI providers through a single, elegant platform. Built with enterprise-grade architecture, it offers universal compatibility, intelligent fallbacks, and a premium user experience.
+
+## ✨ Features
+
+### 🌐 Universal AI Provider Support
+
+- **Anthropic** (Claude 3.5 Sonnet, Haiku, Opus)
+- **OpenAI** (GPT-4, GPT-3.5 Turbo, GPT-4 Turbo)
+- **Google** (Gemini Pro, Gemini Flash)
+- **Cohere** (Command R+, Command R)
+- **Local Models** (Ollama, LMStudio, any OpenAI-compatible API)
+
+### 🚀 Production-Ready Architecture
+
+- **Intelligent Fallbacks** - Automatic provider switching on failures
+- **Real-time Streaming** - Live response streaming from all providers
+- **Advanced Configuration** - Temperature, tokens, custom prompts
+- **Rate Limiting** - Built-in protection and usage tracking
+- **Authentication** - NextAuth.js with multiple providers
+
+### 🎨 Premium User Experience
+
+- **Phoenix Workflow** - Structured development phases
+- **Modern UI** - 2025 design trends with accessibility
+- **Export Options** - Markdown, JSON, PDF conversation exports
+- **Session Management** - Persistent chat history
+- **Responsive Design** - Perfect on all devices
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL (or SQLite for development)
+- At least one AI provider API key
+
+### 1. Clone & Setup
+
+```bash
+git clone https://github.com/your-org/phoenix-ai-universal.git
+cd phoenix-ai-universal
+npm install
+npm run setup
+```
+
+### 2. Configure Environment
+
+Copy `.env.example` to `.env.local` and add your API keys:
+
+```bash
+# Required: At least one AI provider
+ANTHROPIC_API_KEY="sk-ant-your-key-here"
+OPENAI_API_KEY="sk-your-openai-key-here"
+GOOGLE_API_KEY="your-google-api-key-here"
+
+# Database
+DATABASE_URL="postgresql://user:password@localhost:5432/phoenix_ai"
+
+# Authentication
+NEXTAUTH_SECRET="auto-generated-secure-secret"
+NEXTAUTH_URL="http://localhost:3000"
+```
+
+### 3. Initialize Database
+
+```bash
+npx prisma db push
+npx prisma generate
+```
+
+### 4. Start Development
+
+```bash
+npm run dev
+```
+
+Open <http://localhost:3000> 🎉
+
+## 📦 Deployment Options
+
+### Vercel (Recommended)
+
+```bash
+npm run deploy vercel
+```
+
+### Railway
+
+```bash
+npm run deploy railway
+```
+
+### Docker
+
+```bash
+npm run deploy docker
+```
+
+### Render
+
+- Connect your GitHub repository
+- Environment variables will be configured automatically
+
+## 🏗️ Architecture
+
+### Universal Provider Abstraction
+
+```typescript
+// Any AI provider, same interface
+const response = await aiManager.chat(messages, 'anthropic', 'claude-3-5-sonnet', config);
+// Automatic fallback to OpenAI if Anthropic fails
+```
+
+### Intelligent Fallback System
+
+```typescript
+// Configure fallback priority
+const fallbackOrder = ['anthropic', 'openai', 'google', 'local'];
+// Seamless switching on provider failures
+```
+
+### Real-time Streaming
+
+```typescript
+// Stream from any provider
+await aiManager.streamChat(messages, provider, model, config, (chunk) => {
+  // Real-time chunk processing
+});
+```
+
+## 🔧 Configuration
+
+### AI Provider Settings
+
+- **Temperature**: Creativity level (0.0 - 1.0)
+- **Max Tokens**: Response length limit
+- **Streaming**: Real-time vs batch responses
+- **Fallback**: Automatic provider switching
+- **Custom Prompts**: Override system prompts
+
+### Workflow Phases
+
+1. **Discovery** - Requirements gathering
+1. **Conceptualization** - Solution design
+1. **Implementation** - Development
+1. **Integration** - Deployment & optimization
+
+## 📊 Monitoring & Analytics
+
+- **Provider Health Checks** - Real-time status monitoring
+- **Usage Tracking** - Token and request analytics
+- **Error Handling** - Comprehensive logging
+- **Performance Metrics** - Response time tracking
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+npm test
+
+# Watch mode
+npm run test:watch
+
+# Coverage report
+npm run test:coverage
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+1. Create feature branch (`git checkout -b feature/amazing-feature`)
+1. Commit changes (`git commit -m 'Add amazing feature'`)
+1. Push branch (`git push origin feature/amazing-feature`)
+1. Open Pull Request
+
+## 📝 License
+
+MIT License - see <LICENSE.md>
+
+## 🆘 Support
+
+- **Documentation**: [docs.phoenixai.dev](https://docs.phoenixai.dev)
+- **Issues**: [GitHub Issues](https://github.com/your-org/phoenix-ai-universal/issues)
+- **Discord**: [Phoenix AI Community](https://discord.gg/phoenix-ai)
+
+-----
+
+**Built with ❤️ by the Phoenix AI Team**
+
+*Transform ideas into exceptional digital experiences through the perfect marriage of technical excellence and design mastery.*
+

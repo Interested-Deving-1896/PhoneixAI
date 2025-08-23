@@ -1,0 +1,1213 @@
+
+
+import React, { useState, useRef, useEffect, useCallback } from ‘react’;
+import { Send, Upload, Mic, Code, Palette, Settings, BarChart3, FileText, Zap, CheckCircle, Circle, Clock, ChevronDown, Cpu, Wifi, WifiOff, AlertTriangle, Download, Copy, Trash2, RefreshCw, Eye, EyeOff, Save, Play, Pause } from ‘lucide-react’;
+
+// Types
+interface AIMessage {
+role: ‘user’ | ‘assistant’ | ‘system’;
+content: string;
+timestamp?: Date;
+}
+
+interface AIResponse {
+content: string;
+model: string;
+provider: string;
+metadata: {
+tokensUsed?: number;
+responseTime: number;
+confidence?: number;
+finishReason?: string;
+};
+}
+
+interface ChatMessage {
+id: string;
+type: ‘user’ | ‘assistant’ | ‘system’;
+content: string;
+timestamp: Date;
+model?: string;
+provider?: string;
+metadata?: any;
+}
+
+interface ProviderSettings {
+name: string;
+enabled: boolean;
+priority: number;
+models: string[];
+status: ‘online’ | ‘offline’ | ‘checking’ | ‘unknown’;
+lastCheck: Date;
+}
+
+// AI Provider Configuration
+const aiProviders = {
+anthropic: {
+name: ‘Anthropic’,
+models: [
+{ id: ‘claude-3-5-sonnet-20241022’, name: ‘Claude 3.5 Sonnet’, tier: ‘premium’, strengths: [‘reasoning’, ‘code’, ‘analysis’] },
+{ id: ‘claude-3-haiku-20240307’, name: ‘Claude 3 Haiku’, tier: ‘fast’, strengths: [‘speed’, ‘cost’] },
+{ id: ‘claude-3-opus-20240229’, name: ‘Claude 3 Opus’, tier: ‘flagship’, strengths: [‘creativity’, ‘complex reasoning’] }
+],
+color: ‘from-orange-500 to-red-500’,
+icon: ‘🟠’
+},
+openai: {
+name: ‘OpenAI’,
+models: [
+{ id: ‘gpt-4o’, name: ‘GPT-4o’, tier: ‘premium’, strengths: [‘multimodal’, ‘speed’, ‘general’] },
+{ id: ‘gpt-4-turbo’, name: ‘GPT-4 Turbo’, tier: ‘premium’, strengths: [‘reasoning’, ‘creativity’] },
+{ id: ‘gpt-3.5-turbo’, name: ‘GPT-3.5 Turbo’, tier: ‘fast’, strengths: [‘speed’, ‘cost’] }
+],
+color: ‘from-green-500 to-emerald-500’,
+icon: ‘🟢’
+},
+google: {
+name: ‘Google’,
+models: [
+{ id: ‘gemini-1.5-pro’, name: ‘Gemini 1.5 Pro’, tier: ‘premium’, strengths: [‘multimodal’, ‘reasoning’] },
+{ id: ‘gemini-1.5-flash’, name: ‘Gemini 1.5 Flash’, tier: ‘fast’, strengths: [‘speed’, ‘efficiency’] }
+],
+color: ‘from-blue-500 to-indigo-500’,
+icon: ‘🔵’
+}
+};
+
+// Phoenix workflow phases
+const phases = [
+{ id: ‘discovery’, name: ‘Discovery’, icon: BarChart3, color: ‘from-blue-500 to-cyan-500’ },
+{ id: ‘concept’, name: ‘Conceptualization’, icon: Palette, color: ‘from-purple-500 to-pink-500’ },
+{ id: ‘implement’, name: ‘Implementation’, icon: Code, color: ‘from-green-500 to-emerald-500’ },
+{ id: ‘integrate’, name: ‘Integration’, icon: Zap, color: ‘from-orange-500 to-yellow-500’ }
+];
+
+// AI Provider Manager Class
+class AIProviderManager {
+constructor() {
+this.providers = new Map();
+this.fallbackOrder = [‘anthropic’, ‘openai’, ‘google’];
+this.retryDelay = 1000;
+}
+
+async chat(messages, provider, model, config) {
+const startTime = Date.now();
+
+```
+try {
+  // Try primary provider first
+  const response = await this.makeAPICall(messages, provider, model, config);
+  return {
+    ...response,
+    metadata: {
+      ...response.metadata,
+      responseTime: Date.now() - startTime,
+      provider,
+      model
+    }
+  };
+} catch (error) {
+  console.warn(`Provider ${provider} failed:`, error.message);
+  
+  // Only try fallbacks if enabled
+  if (!config.fallbackEnabled) {
+    throw error;
+  }
+  
+  // Try fallback providers
+  for (const fallbackProvider of this.fallbackOrder) {
+    if (fallbackProvider === provider) continue;
+    
+    try {
+      await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+      const fallbackModel = aiProviders[fallbackProvider]?.models[0]?.id;
+      if (!fallbackModel) continue;
+      
+      const response = await this.makeAPICall(messages, fallbackProvider, fallbackModel, config);
+      return {
+        ...response,
+        metadata: {
+          ...response.metadata,
+          responseTime: Date.now() - startTime,
+          provider: fallbackProvider,
+          model: fallbackModel,
+          fallbackUsed: true,
+          originalProvider: provider
+        }
+      };
+    } catch (fallbackError) {
+      console.warn(`Fallback provider ${fallbackProvider} also failed:`, fallbackError.message);
+    }
+  }
+  
+  throw new Error(`All providers failed. Original error: ${error.message}`);
+}
+```
+
+}
+
+async makeAPICall(messages, provider, model, config) {
+// Enhanced simulation with more realistic responses and error handling
+const delay = Math.random() * 2000 + 500; // 0.5-2.5 second delay
+await new Promise(resolve => setTimeout(resolve, delay));
+
+```
+// Simulate occasional failures (5% chance)
+if (Math.random() < 0.05) {
+  const errorMessages = [
+    `${provider} API rate limit exceeded`,
+    `${provider} service temporarily unavailable`,
+    `${provider} authentication failed`,
+    `${provider} model ${model} not found`
+  ];
+  throw new Error(errorMessages[Math.floor(Math.random() * errorMessages.length)]);
+}
+
+const phasePrompts = {
+  discovery: `As Phoenix, your elite Principal Development & Design Architect, I'll help you gather comprehensive requirements and define your project scope.
+```
+
+**Current Phase: Discovery & Requirements Analysis**
+
+I need to understand your project completely. Let me analyze what you’ve described and identify the key components:
+
+**Project Analysis Framework:**
+• **Business Objectives:** What core problems are we solving?
+• **Technical Requirements:** Functional and non-functional specifications
+• **Target Audience:** User personas, needs, and pain points
+• **Platform Constraints:** Technology preferences, budget, timeline
+• **Success Metrics:** How do we measure project success?
+
+**Discovery Questions:**
+
+1. What’s the primary business goal we’re addressing?
+1. Who are your target users and what challenges do they face?
+1. Are there specific technologies or platforms you prefer?
+1. What’s your expected timeline and resource allocation?
+1. Do you have existing systems we need to integrate with?
+
+**Next Steps:**
+Once I have comprehensive requirements, we’ll progress to Conceptualization where I’ll present 2-3 distinct architectural approaches with detailed technical and design rationale.
+
+What specific aspects would you like to explore first?`,
+
+```
+  concept: `**Phoenix Conceptualization Phase**
+```
+
+Based on our discovery session, I’m presenting multiple architectural approaches:
+
+**Concept 1: Modern Serverless Architecture**
+*Philosophy: Cloud-native, scalable, cost-effective*
+
+- **Frontend:** Next.js 14, TypeScript, Tailwind CSS, Framer Motion
+- **Backend:** Vercel Functions, Prisma, Supabase/PlanetScale
+- **Integration:** Stripe, Auth0, Vercel Analytics
+- **Strengths:** Rapid deployment, auto-scaling, minimal ops overhead
+- **Design:** Clean, modern interface with micro-interactions
+
+**Concept 2: Enterprise-Grade Platform**
+*Philosophy: Robust, secure, highly available*
+
+- **Frontend:** Next.js, TypeScript, Design System, PWA
+- **Backend:** Node.js, PostgreSQL, Redis, Docker
+- **Integration:** Enterprise SSO, monitoring, CI/CD pipeline
+- **Strengths:** High security, compliance-ready, extensive monitoring
+- **Design:** Professional dashboard with advanced features
+
+**Concept 3: Performance-Optimized Solution**
+*Philosophy: Speed and efficiency first*
+
+- **Frontend:** Next.js with ISR, Edge Computing, CDN optimization
+- **Backend:** Edge functions, cached APIs, optimized queries
+- **Integration:** Performance monitoring, A/B testing
+- **Strengths:** Sub-second load times, global performance
+- **Design:** Minimalist, performance-focused interface
+
+**My Recommendation:** Concept 1 offers the best balance of modern technology, scalability, and development velocity for most projects.
+
+Which approach aligns with your project goals and constraints?`,
+
+```
+  implement: `**Phoenix Implementation Phase**
+```
+
+I’m now building your solution with production-ready code and enterprise best practices:
+
+**Development Standards:**
+✅ **Architecture:** Component-based with TypeScript for type safety
+✅ **Styling:** Tailwind CSS with custom design system
+✅ **State Management:** React hooks with optimistic updates
+✅ **API Design:** RESTful endpoints with proper validation
+✅ **Database:** Prisma with optimized schemas and migrations
+✅ **Authentication:** NextAuth.js with multiple providers
+✅ **Testing:** Jest + React Testing Library with coverage
+✅ **Accessibility:** WCAG 2.1 AA compliance throughout
+
+**Implementation Workflow:**
+
+1. **Database Schema & Migrations** - Designed and tested
+1. **API Layer** - RESTful endpoints with error handling
+1. **Authentication System** - Secure user management
+1. **Core Components** - Reusable UI component library
+1. **Business Logic** - Feature implementation with testing
+1. **Integration Testing** - End-to-end validation
+1. **Performance Optimization** - Code splitting, lazy loading
+1. **Security Hardening** - Input validation, CORS, rate limiting
+
+**Current Development Focus:**
+I’m implementing features incrementally, ensuring each component is thoroughly tested and documented before integration.
+
+**Code Quality Metrics:**
+
+- TypeScript coverage: 100%
+- Test coverage: >90%
+- Performance score: >95
+- Accessibility score: >95
+- Security scan: Zero critical issues
+
+What specific functionality would you like me to prioritize next?`,
+
+```
+  integrate: `**Phoenix Integration & Deployment Phase**
+```
+
+System integration complete and production deployment ready:
+
+**Integration Checklist:**
+✅ **Component Integration:** All systems working seamlessly
+✅ **End-to-End Testing:** Complete user journey validation  
+✅ **Performance Optimization:** Sub-2s load times achieved
+✅ **Security Hardening:** Penetration testing completed
+✅ **Monitoring Setup:** Error tracking and analytics configured
+✅ **Documentation:** Complete API docs and deployment guides
+
+**Production-Ready Metrics:**
+• **Performance:** Page load < 2s, API response < 300ms
+• **Availability:** 99.9% uptime with auto-scaling
+• **Security:** Zero critical vulnerabilities, OWASP compliant
+• **Accessibility:** WCAG 2.1 AA standards met
+• **SEO:** Core Web Vitals in “Good” range
+
+**Deployment Options Ready:**
+
+1. **Vercel (Recommended):** Optimized for Next.js with edge functions
+1. **Railway:** Full-stack with integrated PostgreSQL
+1. **AWS/Azure:** Enterprise deployment with custom configurations
+1. **Docker:** Containerized deployment for any environment
+
+**Production Environment:**
+
+- Environment variables configured
+- Database indexes optimized
+- CDN and caching configured
+- SSL certificates and security headers
+- Monitoring and alerting active
+- Backup and recovery procedures
+
+**Launch Readiness:**
+Your application is production-ready with enterprise-grade architecture, comprehensive testing, and deployment automation.
+
+**Post-Launch Support:**
+
+- Performance monitoring and optimization
+- Security updates and patches
+- Feature enhancements based on user feedback
+- Scaling strategies as your user base grows
+
+Ready to deploy? I can guide you through the final launch steps!`
+};
+
+```
+const selectedPrompt = phasePrompts[config.phase] || phasePrompts.discovery;
+
+return {
+  content: selectedPrompt,
+  metadata: {
+    tokensUsed: Math.floor(Math.random() * 1000) + 500,
+    confidence: 0.92 + Math.random() * 0.08, // 92-100% confidence
+    finishReason: 'stop'
+  }
+};
+```
+
+}
+
+async streamChat(messages, provider, model, config, onChunk) {
+const response = await this.chat(messages, provider, model, config);
+
+```
+// Simulate streaming by sending chunks
+const words = response.content.split(' ');
+let currentText = '';
+
+for (let i = 0; i < words.length; i++) {
+  if (i > 0) {
+    currentText += ' ';
+  }
+  currentText += words[i];
+  onChunk(words[i] + (i < words.length - 1 ? ' ' : ''));
+  
+  // Variable delay for more realistic streaming
+  const delay = 30 + Math.random() * 70; // 30-100ms per word
+  await new Promise(resolve => setTimeout(resolve, delay));
+}
+
+return response;
+```
+
+}
+
+checkHealth(provider) {
+// Simulate health check with realistic success rate
+return Math.random() > 0.08; // 92% success rate
+}
+}
+
+const PhoenixAI = () => {
+// State Management
+const [messages, setMessages] = useState([
+{
+id: ‘1’,
+type: ‘system’,
+content: “Welcome to Phoenix AI - your elite Principal Development & Design Architect. I’m ready to transform your ideas into exceptional digital experiences through world-class engineering and sophisticated design thinking.\n\n**What I offer:**\n• Universal AI Provider Support (Anthropic, OpenAI, Google)\n• Intelligent Fallback System\n• Structured Development Workflow\n• Production-Ready Architecture\n• Real-time Streaming Responses\n\n**Getting Started:**\nDescribe your project idea, and I’ll guide you through a professional development workflow from discovery to deployment.”,
+timestamp: new Date(),
+model: ‘system’
+}
+]);
+
+const [input, setInput] = useState(’’);
+const [activePhase, setActivePhase] = useState(‘discovery’);
+const [isLoading, setIsLoading] = useState(false);
+const [showModelSelector, setShowModelSelector] = useState(false);
+const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+const [selectedProvider, setSelectedProvider] = useState(‘anthropic’);
+const [selectedModel, setSelectedModel] = useState(‘claude-3-5-sonnet-20241022’);
+const [streamingContent, setStreamingContent] = useState(’’);
+const [sessionTitle, setSessionTitle] = useState(‘New Phoenix Project’);
+const [error, setError] = useState(null);
+
+// AI Configuration
+const [aiConfig, setAiConfig] = useState({
+temperature: 0.7,
+maxTokens: 4000,
+fallbackEnabled: true,
+streamEnabled: true,
+phase: ‘discovery’
+});
+
+// Provider status simulation
+const [providerStatus, setProviderStatus] = useState({
+anthropic: ‘online’,
+openai: ‘online’,
+google: ‘online’
+});
+
+// AI Manager instance
+const aiManager = useRef(new AIProviderManager());
+const messagesEndRef = useRef(null);
+const inputRef = useRef(null);
+
+// Auto-scroll to bottom
+useEffect(() => {
+messagesEndRef.current?.scrollIntoView({ behavior: ‘smooth’ });
+}, [messages, streamingContent]);
+
+// Update AI config when phase changes
+useEffect(() => {
+setAiConfig(prev => ({ …prev, phase: activePhase }));
+}, [activePhase]);
+
+// Simulate provider health checks
+useEffect(() => {
+const healthCheck = setInterval(() => {
+setProviderStatus(prev => ({
+…prev,
+anthropic: Math.random() > 0.05 ? ‘online’ : ‘offline’,
+openai: Math.random() > 0.05 ? ‘online’ : ‘offline’,
+google: Math.random() > 0.05 ? ‘online’ : ‘offline’
+}));
+}, 30000);
+
+```
+return () => clearInterval(healthCheck);
+```
+
+}, []);
+
+const sendMessage = useCallback(async () => {
+if (!input.trim() || isLoading) return;
+
+```
+const userMessage = {
+  id: Date.now().toString(),
+  type: 'user',
+  content: input,
+  timestamp: new Date(),
+  model: `${selectedProvider}/${selectedModel}`
+};
+
+setMessages(prev => [...prev, userMessage]);
+setInput('');
+setIsLoading(true);
+setError(null);
+setStreamingContent('');
+
+try {
+  const aiMessages = [...messages, userMessage].map(msg => ({
+    role: msg.type === 'user' ? 'user' : msg.type === 'assistant' ? 'assistant' : 'system',
+    content: msg.content,
+    timestamp: msg.timestamp
+  }));
+
+  if (aiConfig.streamEnabled) {
+    // Streaming response
+    let fullContent = '';
+    const response = await aiManager.current.streamChat(
+      aiMessages,
+      selectedProvider,
+      selectedModel,
+      aiConfig,
+      (chunk) => {
+        fullContent += chunk;
+        setStreamingContent(fullContent);
+      }
+    );
+
+    const assistantMessage = {
+      id: (Date.now() + 1).toString(),
+      type: 'assistant',
+      content: response.content,
+      timestamp: new Date(),
+      model: `${response.metadata.provider}/${response.metadata.model}`,
+      metadata: response.metadata
+    };
+
+    setMessages(prev => [...prev, assistantMessage]);
+    setStreamingContent('');
+  } else {
+    // Regular response
+    const response = await aiManager.current.chat(
+      aiMessages,
+      selectedProvider,
+      selectedModel,
+      aiConfig
+    );
+
+    const assistantMessage = {
+      id: (Date.now() + 1).toString(),
+      type: 'assistant',
+      content: response.content,
+      timestamp: new Date(),
+      model: `${response.metadata.provider}/${response.metadata.model}`,
+      metadata: response.metadata
+    };
+
+    setMessages(prev => [...prev, assistantMessage]);
+  }
+} catch (error) {
+  console.error('Chat error:', error);
+  setError(error.message);
+  
+  const errorMessage = {
+    id: (Date.now() + 2).toString(),
+    type: 'system',
+    content: `Error: ${error.message}`,
+    timestamp: new Date(),
+    model: 'error'
+  };
+  setMessages(prev => [...prev, errorMessage]);
+} finally {
+  setIsLoading(false);
+}
+```
+
+}, [input, messages, selectedProvider, selectedModel, aiConfig, isLoading]);
+
+// Utility Functions
+const getCurrentModel = () => {
+return aiProviders[selectedProvider]?.models.find(m => m.id === selectedModel);
+};
+
+const getStatusIcon = (status) => {
+switch(status) {
+case ‘online’: return <Wifi className="w-4 h-4 text-green-500" />;
+case ‘offline’: return <WifiOff className="w-4 h-4 text-red-500" />;
+case ‘checking’: return <Clock className="w-4 h-4 text-yellow-500 animate-spin" />;
+default: return <AlertTriangle className="w-4 h-4 text-gray-500" />;
+}
+};
+
+const exportChat = (format) => {
+const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, ‘-’);
+let content = ‘’;
+let filename = ‘’;
+
+```
+if (format === 'markdown') {
+  content = `# ${sessionTitle}\n\nGenerated: ${new Date().toLocaleString()}\nProvider: ${selectedProvider}\nModel: ${selectedModel}\nPhase: ${activePhase}\n\n---\n\n`;
+  
+  messages.forEach(msg => {
+    const role = msg.type === 'user' ? '**User**' : msg.type === 'assistant' ? '**Phoenix**' : '**System**';
+    content += `${role}: ${msg.content}\n\n`;
+  });
+  
+  filename = `phoenix-chat-${timestamp}.md`;
+} else {
+  content = JSON.stringify({
+    title: sessionTitle,
+    timestamp: new Date().toISOString(),
+    provider: selectedProvider,
+    model: selectedModel,
+    phase: activePhase,
+    config: aiConfig,
+    messages: messages
+  }, null, 2);
+  
+  filename = `phoenix-chat-${timestamp}.json`;
+}
+
+const blob = new Blob([content], { type: format === 'markdown' ? 'text/markdown' : 'application/json' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = filename;
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+URL.revokeObjectURL(url);
+```
+
+};
+
+const clearChat = () => {
+setMessages([{
+id: ‘1’,
+type: ‘system’,
+content: “Chat cleared. Ready for new project discussion.”,
+timestamp: new Date(),
+model: ‘system’
+}]);
+setSessionTitle(‘New Phoenix Project’);
+};
+
+// Render model selector
+const renderModelSelector = () => (
+<div className="absolute top-full left-0 mt-2 w-96 bg-gray-800 border border-gray-600 rounded-xl shadow-2xl z-50 p-4">
+<div className="space-y-4">
+<div className="flex items-center justify-between">
+<h3 className="text-white font-semibold">AI Configuration</h3>
+<button
+onClick={() => setShowModelSelector(false)}
+className=“text-gray-400 hover:text-white”
+>
+✕
+</button>
+</div>
+
+```
+    {/* Provider Selection */}
+    <div className="space-y-2">
+      <label className="text-sm text-gray-300">Provider</label>
+      <div className="grid grid-cols-2 gap-2">
+        {Object.entries(aiProviders).map(([key, provider]) => (
+          <button
+            key={key}
+            onClick={() => {
+              setSelectedProvider(key);
+              setSelectedModel(provider.models[0].id);
+            }}
+            className={`p-3 rounded-lg border text-left transition-all ${
+              selectedProvider === key 
+                ? `bg-gradient-to-r ${provider.color} text-white border-transparent` 
+                : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-500'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span>{provider.icon}</span>
+                <span className="font-medium">{provider.name}</span>
+              </div>
+              {getStatusIcon(providerStatus[key])}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+
+    {/* Model Selection */}
+    <div className="space-y-2">
+      <label className="text-sm text-gray-300">Model</label>
+      <select
+        value={selectedModel}
+        onChange={(e) => setSelectedModel(e.target.value)}
+        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+      >
+        {aiProviders[selectedProvider]?.models.map(model => (
+          <option key={model.id} value={model.id}>
+            {model.name} ({model.tier})
+          </option>
+        ))}
+      </select>
+      
+      {getCurrentModel() && (
+        <div className="text-xs text-gray-400 p-2 bg-gray-900/50 rounded">
+          <strong>Strengths:</strong> {getCurrentModel()?.strengths.join(', ')}
+        </div>
+      )}
+    </div>
+
+    {/* Advanced Settings */}
+    <button
+      onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+      className="w-full flex items-center justify-between p-2 text-sm text-gray-300 hover:text-white"
+    >
+      <span>Advanced Settings</span>
+      <ChevronDown className={`w-4 h-4 transform transition-transform ${showAdvancedSettings ? 'rotate-180' : ''}`} />
+    </button>
+
+    {showAdvancedSettings && (
+      <div className="space-y-3 border-t border-gray-700 pt-4">
+        <div>
+          <label className="text-sm text-gray-300 flex items-center justify-between">
+            Temperature 
+            <span className="text-gray-400">{aiConfig.temperature}</span>
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.1"
+            value={aiConfig.temperature}
+            onChange={(e) => setAiConfig(prev => ({...prev, temperature: parseFloat(e.target.value)}))}
+            className="w-full mt-1"
+          />
+        </div>
+        
+        <div>
+          <label className="text-sm text-gray-300 flex items-center justify-between">
+            Max Tokens
+            <span className="text-gray-400">{aiConfig.maxTokens}</span>
+          </label>
+          <input
+            type="range"
+            min="1000"
+            max="8000"
+            step="500"
+            value={aiConfig.maxTokens}
+            onChange={(e) => setAiConfig(prev => ({...prev, maxTokens: parseInt(e.target.value)}))}
+            className="w-full mt-1"
+          />
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <label className="text-sm text-gray-300">Fallback Enabled</label>
+          <input
+            type="checkbox"
+            checked={aiConfig.fallbackEnabled}
+            onChange={(e) => setAiConfig(prev => ({...prev, fallbackEnabled: e.target.checked}))}
+            className="rounded"
+          />
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <label className="text-sm text-gray-300">Stream Responses</label>
+          <input
+            type="checkbox"
+            checked={aiConfig.streamEnabled}
+            onChange={(e) => setAiConfig(prev => ({...prev, streamEnabled: e.target.checked}))}
+            className="rounded"
+          />
+        </div>
+      </div>
+    )}
+  </div>
+</div>
+```
+
+);
+
+// Render message
+const renderMessage = (message) => {
+if (message.type === ‘system’) {
+return (
+<div key={message.id} className="flex justify-center mb-8">
+<div className="bg-gradient-to-r from-violet-500/10 to-purple-500/10 border border-violet-500/20 rounded-2xl p-6 max-w-4xl text-center">
+<div className="w-12 h-12 bg-gradient-to-r from-violet-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+<Zap className="w-6 h-6 text-white" />
+</div>
+<div className="text-gray-300 leading-relaxed whitespace-pre-wrap text-left">
+{message.content}
+</div>
+</div>
+</div>
+);
+}
+
+```
+if (message.type === 'user') {
+  return (
+    <div key={message.id} className="flex justify-end mb-6">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl px-6 py-4 max-w-2xl">
+        <p className="text-white">{typeof message.content === 'string' ? message.content : JSON.stringify(message.content, null, 2)}</p>
+        <div className="flex items-center justify-between mt-2 text-xs text-blue-200 opacity-75">
+          <span>{message.timestamp.toLocaleTimeString()}</span>
+          <button
+            onClick={() => copyToClipboard(typeof message.content === 'string' ? message.content : JSON.stringify(message.content))}
+            className="hover:text-white transition-colors"
+            title="Copy message"
+          >
+            <Copy className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+if (message.type === 'assistant') {
+  const provider = aiProviders[selectedProvider];
+  
+  return (
+    <div key={message.id} className="flex justify-start mb-6">
+      <div className="bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6 max-w-4xl">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-gradient-to-r from-violet-500 to-purple-500 rounded-full flex items-center justify-center mr-3">
+              <Zap className="w-4 h-4 text-white" />
+            </div>
+            <h3 className="text-white font-semibold">Phoenix Response</h3>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 text-xs text-gray-400">
+              <span className={`w-2 h-2 rounded-full bg-gradient-to-r ${provider?.color}`}></span>
+              <span>{getCurrentModel()?.name}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+          {typeof message.content === 'string' ? message.content : JSON.stringify(message.content, null, 2)}
+        </div>
+        
+        {message.metadata && (
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-700/30 text-xs text-gray-500 flex-wrap gap-2">
+            {message.metadata.tokensUsed && (
+              <span>Tokens: {message.metadata.tokensUsed}</span>
+            )}
+            {message.metadata.responseTime && (
+              <span>Response: {message.metadata.responseTime}ms</span>
+            )}
+            {message.metadata.fallbackUsed && (
+              <span className="text-yellow-400">Fallback Used</span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+};
+
+return (
+<div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+{/* Header */}
+<header className="border-b border-gray-700/50 bg-gray-800/30 backdrop-blur-sm">
+<div className="max-w-7xl mx-auto px-6 py-4">
+<div className="flex items-center justify-between">
+<div className="flex items-center space-x-4">
+<div className="w-10 h-10 bg-gradient-to-r from-violet-500 to-purple-500 rounded-xl flex items-center justify-center">
+<Zap className="w-6 h-6 text-white" />
+</div>
+<div>
+<h1 className="text-xl font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">
+Phoenix AI Universal
+</h1>
+<p className="text-sm text-gray-400">Elite Development & Design Architect</p>
+</div>
+</div>
+
+```
+        <div className="flex items-center space-x-4">
+          <input
+            type="text"
+            value={sessionTitle}
+            onChange={(e) => setSessionTitle(e.target.value)}
+            className="px-3 py-1 bg-gray-700/50 border border-gray-600 rounded text-sm text-white max-w-48"
+          />
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => exportChat('markdown')}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+              title="Export as Markdown"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => exportChat('json')}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+              title="Export as JSON"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+            <button
+              onClick={clearChat}
+              className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700/50 rounded-lg transition-colors"
+              title="Clear Chat"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* AI Model Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setShowModelSelector(!showModelSelector)}
+              className="flex items-center space-x-3 px-4 py-2 bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <span className={`w-3 h-3 rounded-full bg-gradient-to-r ${aiProviders[selectedProvider]?.color}`}></span>
+              <span className="text-sm font-medium">{getCurrentModel()?.name || 'Select Model'}</span>
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            {showModelSelector && renderModelSelector()}
+          </div>
+          
+          <div className="flex items-center space-x-2 text-sm text-gray-400">
+            {getStatusIcon(providerStatus[selectedProvider])}
+            <span className="capitalize">{providerStatus[selectedProvider]}</span>
+          </div>
+          
+          <button
+            onClick={() => {
+              // Simulate health check
+              setProviderStatus(prev => ({
+                ...prev,
+                [selectedProvider]: 'checking'
+              }));
+              setTimeout(() => {
+                setProviderStatus(prev => ({
+                  ...prev,
+                  [selectedProvider]: Math.random() > 0.1 ? 'online' : 'offline'
+                }));
+              }, 1000);
+            }}
+            className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
+            title="Refresh Provider Status"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div className="max-w-7xl mx-auto px-6 py-6 flex gap-6 h-[calc(100vh-88px)]">
+    {/* Sidebar */}
+    <div className="w-80 space-y-6">
+      {/* Workflow Phases */}
+      <div className="bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6">
+        <h3 className="text-white font-semibold mb-4">Workflow Phases</h3>
+        <div className="space-y-3">
+          {phases.map((phase) => (
+            <button
+              key={phase.id}
+              onClick={() => setActivePhase(phase.id)}
+              className={`w-full flex items-center space-x-3 p-3 rounded-xl transition-all ${
+                activePhase === phase.id 
+                  ? 'bg-gradient-to-r ' + phase.color + ' text-white' 
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
+              }`}
+            >
+              <phase.icon className="w-5 h-5" />
+              <span className="font-medium">{phase.name}</span>
+              {activePhase === phase.id && <CheckCircle className="w-4 h-4 ml-auto" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Provider Status */}
+      <div className="bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6">
+        <h3 className="text-white font-semibold mb-4">Provider Status</h3>
+        <div className="space-y-2">
+          {Object.entries(aiProviders).map(([key, provider]) => (
+            <div key={key} className="flex items-center justify-between p-2">
+              <div className="flex items-center space-x-3">
+                <span>{provider.icon}</span>
+                <span className="text-sm text-gray-300">{provider.name}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                {getStatusIcon(providerStatus[key])}
+                <button
+                  onClick={() => {
+                    setProviderStatus(prev => ({ ...prev, [key]: 'checking' }));
+                    setTimeout(() => {
+                      setProviderStatus(prev => ({
+                        ...prev,
+                        [key]: Math.random() > 0.1 ? 'online' : 'offline'
+                      }));
+                    }, 1000);
+                  }}
+                  className="text-xs text-gray-500 hover:text-gray-300"
+                >
+                  Check
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* AI Configuration Summary */}
+      <div className="bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6">
+        <h3 className="text-white font-semibold mb-4">Current Configuration</h3>
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-400">Provider:</span>
+            <span className="text-gray-300">{aiProviders[selectedProvider]?.name}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Model:</span>
+            <span className="text-gray-300">{getCurrentModel()?.name}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Temperature:</span>
+            <span className="text-gray-300">{aiConfig.temperature}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Max Tokens:</span>
+            <span className="text-gray-300">{aiConfig.maxTokens}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Streaming:</span>
+            <span className={`text-sm ${aiConfig.streamEnabled ? 'text-green-400' : 'text-red-400'}`}>
+              {aiConfig.streamEnabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Fallback:</span>
+            <span className={`text-sm ${aiConfig.fallbackEnabled ? 'text-green-400' : 'text-red-400'}`}>
+              {aiConfig.fallbackEnabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* System Status */}
+      <div className="bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6">
+        <h3 className="text-white font-semibold mb-4">System Status</h3>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-400">Universal AI System</span>
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="text-xs text-green-400">Active</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-400">Fallback Engine</span>
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span className="text-xs text-blue-400">Ready</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-400">Real-time Streaming</span>
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-violet-500 rounded-full animate-pulse"></div>
+              <span className="text-xs text-violet-400">Enabled</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Session Stats */}
+      <div className="bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6">
+        <h3 className="text-white font-semibold mb-4">Session Stats</h3>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-400">Messages:</span>
+            <span className="text-gray-300">{messages.length}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Phase:</span>
+            <span className="text-gray-300">{phases.find(p => p.id === activePhase)?.name}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Started:</span>
+            <span className="text-gray-300">{messages[0]?.timestamp.toLocaleTimeString()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Total Tokens:</span>
+            <span className="text-gray-300">
+              {messages.reduce((sum, msg) => sum + (msg.metadata?.tokensUsed || 0), 0).toLocaleString()}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Main Chat Area */}
+    <div className="flex-1 flex flex-col bg-gray-800/30 border border-gray-700/50 rounded-2xl">
+      {/* Error Display */}
+      {error && (
+        <div className="p-4 bg-red-500/10 border-b border-red-500/20 text-red-300 text-sm">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-4 h-4" />
+            <span>{error}</span>
+            <button
+              onClick={() => setError(null)}
+              className="ml-auto text-red-400 hover:text-red-300"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {messages.map((message, index) => renderMessage(message))}
+        
+        {/* Streaming Content */}
+        {streamingContent && (
+          <div className="flex justify-start mb-6">
+            <div className="bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6 max-w-4xl">
+              <div className="flex items-center mb-4">
+                <div className="w-8 h-8 bg-gradient-to-r from-violet-500 to-purple-500 rounded-full flex items-center justify-center mr-3">
+                  <Zap className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="text-white font-semibold">Phoenix Response</h3>
+                <div className="ml-auto flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-violet-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-gray-400">Streaming...</span>
+                </div>
+              </div>
+              <div className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                {streamingContent}
+                <span className="animate-pulse">▌</span>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Loading Indicator */}
+        {isLoading && !streamingContent && (
+          <div className="flex justify-start mb-6">
+            <div className="bg-gray-800/50 border border-gray-700/50 rounded-2xl px-6 py-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-violet-500 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                <div className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                <span className="text-gray-400 ml-2">Phoenix is thinking via {getCurrentModel()?.name}...</span>
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Area */}
+      <div className="border-t border-gray-700/50 p-6">
+        <div className="relative flex items-center space-x-3">
+          <div className="flex-1 relative">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+              placeholder="Describe your project or ask for development guidance..."
+              className="w-full bg-gray-700/50 border border-gray-600/50 rounded-xl px-4 py-3 pr-12 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50"
+              disabled={isLoading}
+            />
+            <button className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
+              <Mic className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <button 
+            className="p-3 text-gray-400 hover:text-white transition-colors hover:bg-gray-700/50 rounded-xl"
+            title="Upload files"
+          >
+            <Upload className="w-5 h-5" />
+          </button>
+          
+          <button
+            onClick={sendMessage}
+            disabled={!input.trim() || isLoading || providerStatus[selectedProvider] === 'offline'}
+            className="p-3 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all"
+            title="Send message"
+          >
+            <Send className="w-5 h-5 text-white" />
+          </button>
+        </div>
+        
+        <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
+          <div className="flex items-center space-x-4">
+            <span>Phase: {phases.find(p => p.id === activePhase)?.name}</span>
+            <span>•</span>
+            <span>AI: {getCurrentModel()?.name}</span>
+            <span>•</span>
+            <span>Provider: {aiProviders[selectedProvider]?.name}</span>
+            {providerStatus[selectedProvider] === 'offline' && (
+              <>
+                <span>•</span>
+                <span className="text-red-400">Fallback Ready</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span>Universal AI System Active</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {/* Demo Instructions Panel */}
+  <div className="fixed bottom-4 right-4 bg-gray-800/90 border border-gray-600/50 rounded-xl p-4 max-w-sm backdrop-blur-sm">
+    <div className="flex items-center justify-between mb-2">
+      <h4 className="text-sm font-semibold text-white">Phoenix AI Demo</h4>
+      <span className="text-xs bg-violet-500/20 text-violet-300 px-2 py-1 rounded">LIVE</span>
+    </div>
+    <p className="text-xs text-gray-400 mb-3">
+      This is a fully functional demo with simulated AI responses. Features working provider fallbacks, 
+      real-time streaming, and complete workflow management.
+    </p>
+    <div className="space-y-2 text-xs">
+      <div className="flex items-center space-x-2">
+        <CheckCircle className="w-3 h-3 text-green-400" />
+        <span className="text-gray-300">Universal Provider Support</span>
+      </div>
+      <div className="flex items-center space-x-2">
+        <CheckCircle className="w-3 h-3 text-green-400" />
+        <span className="text-gray-300">Intelligent Fallback System</span>
+      </div>
+      <div className="flex items-center space-x-2">
+        <CheckCircle className="w-3 h-3 text-green-400" />
+        <span className="text-gray-300">Real-time Streaming</span>
+      </div>
+      <div className="flex items-center space-x-2">
+        <CheckCircle className="w-3 h-3 text-green-400" />
+        <span className="text-gray-300">Phoenix Workflow Phases</span>
+      </div>
+    </div>
+    <div className="mt-3 pt-3 border-t border-gray-700/50">
+      <p className="text-xs text-gray-500">
+        Try asking: "Help me build a modern web application" or switch between workflow phases.
+      </p>
+    </div>
+  </div>
+</div>
+```
+
+);
+};
+
+export default PhoenixAI;
